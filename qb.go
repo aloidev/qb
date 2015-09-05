@@ -77,7 +77,7 @@ func (b *Builder) SelectAll() string {
 
 //SelectByPK return a query with the where clause from PrimaryKey.
 func (b *Builder) SelectByPK() string {
-	query := b.initialQuery() + " " + b.whereQuery() + " " + b.orderByQuery()
+	query := b.initialQuery() + " " + b.whereQuery()
 	return query
 }
 

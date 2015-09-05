@@ -46,16 +46,16 @@ func TestSelectByPK(t *testing.T) {
 		explicit bool
 		want     string
 	}{
-		{simple{}, false, "SELECT * FROM simple WHERE id = $1 ORDER BY id"},
-		{simple{}, true, "SELECT id,name FROM simple WHERE id = $1 ORDER BY id"},
+		{simple{}, false, "SELECT * FROM simple WHERE id = $1"},
+		{simple{}, true, "SELECT id,name FROM simple WHERE id = $1"},
 		{twoPK{}, false,
-			"SELECT * FROM twopk WHERE docno = $1 AND rev = $2 ORDER BY docno,rev"},
+			"SELECT * FROM twopk WHERE docno = $1 AND rev = $2"},
 		{twoPK{}, true,
-			"SELECT docno,rev,name FROM twopk WHERE docno = $1 AND rev = $2 ORDER BY docno,rev"},
+			"SELECT docno,rev,name FROM twopk WHERE docno = $1 AND rev = $2"},
 		{threePK{}, false,
-			"SELECT * FROM threepk WHERE docno = $1 AND rev = $2 AND by = $3 ORDER BY docno,rev,by"},
+			"SELECT * FROM threepk WHERE docno = $1 AND rev = $2 AND by = $3"},
 		{threePK{}, true,
-			"SELECT docno,rev,name,by FROM threepk WHERE docno = $1 AND rev = $2 AND by = $3 ORDER BY docno,rev,by"},
+			"SELECT docno,rev,name,by FROM threepk WHERE docno = $1 AND rev = $2 AND by = $3"},
 	}
 	for _, test := range tests {
 		testSelectByPK(t, test.tbl, test.explicit, test.want)

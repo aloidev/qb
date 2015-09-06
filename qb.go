@@ -1,10 +1,10 @@
 //Package qb is simple library to construct SQL Query.
 //Supported filter of are :
-//	"=" 	equal
-//	">"		greater than
-//	"<"		less than
-//	">=" 	greater than and equal
-//	"<="	less than and equal
+//	"="  equal
+//	">"  greater than
+//	"<"  less than
+//	">=" greater than and equal
+//	"<=" less than and equal
 package qb
 
 import (

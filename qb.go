@@ -152,6 +152,23 @@ func (b *Builder) Reset() *Builder {
 	return b
 }
 
+//InsertQuery Return a query to insert to the database.
+func (b *Builder) InsertQuery() string {
+	n := len(b.t.Fields())
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
+		b.t.TableName(),
+		strings.Join(b.t.Fields(), ","),
+		b.makePlaceholder(n))
+	return query
+}
+
+func (b *Builder) makePlaceholder(n int) string {
+	if b.driver == "pq" {
+		return pqMakePlaceholder(n)
+	}
+	return "makePlaceholder: should not happen"
+}
+
 func (b *Builder) fieldError() error {
 	for _, field := range b.fields {
 		if !b.fieldExist(field) {

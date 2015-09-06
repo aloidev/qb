@@ -1,34 +1,37 @@
 package qb
 
-import "fmt"
-
-var pqPlaceholder = "$"
+import (
+	"strconv"
+	"strings"
+)
 
 func pqWhere(fields []string) string {
-	where := fmt.Sprintf("WHERE %s = $1", fields[0])
-	if len(fields) == 1 {
-		return where
+	w := make([]string, len(fields))
+	for i, field := range fields {
+		w[i] = field + " = $" + strconv.Itoa(i+1)
 	}
-	n := 2
-	for _, field := range fields[1:] {
-		where += fmt.Sprintf(" AND %s = $%d", field, n)
-		n++
-	}
+	where := "WHERE " + strings.Join(w, " AND ")
 	return where
 }
 
 func pqFilter(filters []filter) (where string, args []interface{}) {
 	if len(filters) == 0 {
-		return "", nil
+		return
 	}
-
-	where = fmt.Sprintf("WHERE %s %s $1", filters[0].field, filters[0].op)
-	args = append(args, filters[0].value)
-	n := 2
-	for _, filter := range filters[1:] {
-		where += fmt.Sprintf(" AND %s %s $%d", filter.field, filter.op, n)
-		args = append(args, filter.value)
-		n++
+	args = make([]interface{}, len(filters))
+	w := make([]string, len(filters))
+	for i, filter := range filters {
+		w[i] = filter.field + " " + filter.op + " $" + strconv.Itoa(i+1)
+		args[i] = filter.value
 	}
+	where = "WHERE " + strings.Join(w, " AND ")
 	return where, args
+}
+
+func pqMakePlaceholder(n int) string {
+	p := make([]string, n)
+	for i := 0; i < n; i++ {
+		p[i] = "$" + strconv.Itoa(i+1)
+	}
+	return strings.Join(p, ",")
 }

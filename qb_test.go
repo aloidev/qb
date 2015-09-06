@@ -1,6 +1,9 @@
 package qb
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 type simple struct {
 	ID   string `pk:"1"`
@@ -63,14 +66,105 @@ func TestSelectByPK(t *testing.T) {
 }
 
 func testSelectByPK(t *testing.T, tbl interface{}, explicit bool, want string) {
+	b := newBuilder(t, tbl, explicit)
+	got := b.SelectByPK()
+	if got != want {
+		t.Errorf("got query: %s \n             want %s", got, want)
+	}
+}
+
+func TestSetFilterQuery(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	b.SetFilter("age", "=", 20)
+	wantQ := "SELECT * FROM emp WHERE age = $1"
+	wantA := []interface{}{20}
+	testQuery(t, b, wantQ, wantA)
+	b.SetFilter("Name", "=", "me")
+	wantQ = "SELECT * FROM emp WHERE age = $1 AND name = $2"
+	wantA = []interface{}{20, "me"}
+	testQuery(t, b, wantQ, wantA)
+}
+
+func TestSetRangeQuery(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	b.SetRange("Name", "a", "b")
+	wantQ := "SELECT * FROM emp WHERE name >= $1 AND name <= $2"
+	wantA := []interface{}{"a", "b"}
+	testQuery(t, b, wantQ, wantA)
+}
+
+func testQuery(t *testing.T, b *Builder, wantQ string, wantA []interface{}) {
+	gotQ, gotA := b.Query()
+	if gotQ != wantQ {
+		t.Errorf("got query: %s \n             want %s", gotQ, wantQ)
+	}
+	if !reflect.DeepEqual(gotA, wantA) {
+		t.Errorf("got args: %v want %v", gotA, wantA)
+	}
+}
+
+func TestError(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	b.SetFilter("NamE", "=", "me")
+	testError(t, b, false)
+	b.SetFilter("FieldNotExist", "=", "b")
+	testError(t, b, true)
+}
+
+func TestReset(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	b.SetFilter("age", "=", 20)
+	b.SetFields("ID")
+	wantQ := "SELECT id FROM emp WHERE age = $1"
+	wantA := []interface{}{20}
+	testQuery(t, b, wantQ, wantA)
+	b.Reset()
+	b.SetFields("name")
+	b.SetFilter("Name", "=", "me")
+	wantQ = "SELECT name FROM emp WHERE name = $1"
+	wantA = []interface{}{"me"}
+	testQuery(t, b, wantQ, wantA)
+}
+
+func testError(t *testing.T, b *Builder, err bool) {
+	got := b.Error()
+	if err {
+		if got == nil {
+			t.Errorf("got: nil want an error")
+		}
+		return
+	}
+	if got != nil {
+		t.Errorf("got err: %v want nil", got)
+	}
+}
+
+func newBuilder(t *testing.T, tbl interface{}, explicit bool) *Builder {
 	ti, err := NewTable("", tbl)
 	if err != nil {
 		t.Errorf("got err : %v want nil", err)
 	}
 
 	b := NewPQ(ti, explicit)
-	got := b.SelectByPK()
-	if got != want {
-		t.Errorf("got query: %s \n             want %s", got, want)
-	}
+	return b
 }

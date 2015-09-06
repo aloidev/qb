@@ -41,10 +41,18 @@ func NewPQ(t Tabler, explicit bool) *Builder {
 	return &Builder{explicit: explicit, t: t, driver: "pq"}
 }
 
+//SetFields set the fields to retrieve from table.
+func (b *Builder) SetFields(fieldName ...string) *Builder {
+	for _, field := range fieldName {
+		b.fields = append(b.fields, strings.ToLower(field))
+	}
+	return b
+}
+
 //SetFilter set the where clause for the query, filter will be AND with other filter.
 func (b *Builder) SetFilter(fieldName string, op string, value interface{}) *Builder {
 	f := filter{
-		field: fieldName,
+		field: strings.ToLower(fieldName),
 		op:    op,
 		value: value,
 	}
@@ -102,7 +110,14 @@ func (b *Builder) pkWhereQuery() string {
 	if b.driver == "pq" {
 		return pqWhere(b.t.PrimaryKeys())
 	}
-	return ""
+	return "pkWhereQuery: should not happen"
+}
+
+func (b *Builder) filterQuery() (where string, args []interface{}) {
+	if b.driver == "pq" {
+		return pqFilter(b.filters)
+	}
+	return "filterQuery: should not happen", nil
 }
 
 //Error check the query
@@ -120,8 +135,19 @@ func (b *Builder) Error() error {
 }
 
 //Query return a query without checking the error.
-func (b *Builder) Query() string {
-	return ""
+func (b *Builder) Query() (query string, args []interface{}) {
+	where, args := b.filterQuery()
+	query = b.initialQuery() + " " + where
+	return query, args
+}
+
+//Reset zeroes the fields,filters and orderBy so the builder can be reuse to construct new query
+//without include the old fields,filters and orderBy.
+func (b *Builder) Reset() *Builder {
+	b.fields = []string{}
+	b.filters = []filter{}
+	b.orderBy = []string{}
+	return b
 }
 
 func (b *Builder) fieldError() error {
@@ -161,10 +187,9 @@ func (b *Builder) fieldExist(field string) bool {
 }
 
 //QueryMust will panic when builder return an error.
-func (b *Builder) QueryMust() string {
+func (b *Builder) QueryMust() (query string, args []interface{}) {
 	if err := b.Error(); err != nil {
 		panic(err)
 	}
-	query := b.Query()
-	return query
+	return b.Query()
 }

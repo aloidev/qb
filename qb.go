@@ -26,19 +26,19 @@ type filter struct {
 
 //Builder is
 type Builder struct {
-	explicit    bool
-	t           Tabler
-	placeholder string
-	fields      []string
-	orderBy     []string
-	filters     []filter
+	explicit bool
+	t        Tabler
+	driver   string
+	fields   []string
+	orderBy  []string
+	filters  []filter
 }
 
 //NewPQ create a builder for PostgreSQL database.
 //If explicit, when fields is not specified the builder will return query with the fields,
 //instead of *.
 func NewPQ(t Tabler, explicit bool) *Builder {
-	return &Builder{explicit: explicit, t: t, placeholder: "$"}
+	return &Builder{explicit: explicit, t: t, driver: "pq"}
 }
 
 //SetFilter set the where clause for the query, filter will be AND with other filter.
@@ -77,7 +77,7 @@ func (b *Builder) SelectAll() string {
 
 //SelectByPK return a query with the where clause from PrimaryKey.
 func (b *Builder) SelectByPK() string {
-	query := b.initialQuery() + " " + b.whereQuery()
+	query := b.initialQuery() + " " + b.pkWhereQuery()
 	return query
 }
 
@@ -98,18 +98,11 @@ func (b *Builder) orderByQuery() string {
 	return orderBy
 }
 
-func (b *Builder) whereQuery() string {
-	pk := b.t.PrimaryKeys()
-	where := fmt.Sprintf("WHERE %s = %s1", pk[0], b.placeholder)
-	if len(pk) == 1 {
-		return where
+func (b *Builder) pkWhereQuery() string {
+	if b.driver == "pq" {
+		return pqWhere(b.t.PrimaryKeys())
 	}
-	n := 2
-	for _, field := range pk[1:] {
-		where += fmt.Sprintf(" AND %s = %s%d", field, b.placeholder, n)
-		n++
-	}
-	return where
+	return ""
 }
 
 //Error check the query

@@ -1,8 +1,10 @@
 //Package qb is simple library to construct SQL Query.
 //Supported filter of are :
 //	"=" 	equal
-//	">=" 	greater than
-//	"<="	less than
+//	">"		greater than
+//	"<"		less than
+//	">=" 	greater than and equal
+//	"<="	less than and equal
 package qb
 
 import (
@@ -173,6 +175,9 @@ func (b *Builder) filterError() error {
 		if !b.fieldExist(filter.field) {
 			return fmt.Errorf("field %s doesn't exist", filter.field)
 		}
+		if err := b.isValidOp(filter.op); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -184,6 +189,13 @@ func (b *Builder) fieldExist(field string) bool {
 		}
 	}
 	return false
+}
+
+func (b *Builder) isValidOp(op string) error {
+	if op == "=" || op == "<" || op == ">" || op == ">=" || op == "<=" {
+		return nil
+	}
+	return fmt.Errorf("filter op %s is not supported", op)
 }
 
 //QueryMust will panic when builder return an error.

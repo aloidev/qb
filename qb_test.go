@@ -196,20 +196,6 @@ func TestReset(t *testing.T) {
 	testQuery(t, b, wantQ, wantA)
 }
 
-func TestInsertQuery(t *testing.T) {
-	type Emp struct {
-		ID   string `pk:"1"`
-		Name string
-		Age  int
-	}
-	b := newBuilder(t, Emp{}, false)
-	got := b.InsertQuery()
-	want := "INSERT INTO emp (id,name,age) VALUES ($1,$2,$3)"
-	if got != want {
-		t.Errorf("got: %s want %s", got, want)
-	}
-}
-
 func testError(t *testing.T, b *Builder, err bool) {
 	got := b.Error()
 	if err {

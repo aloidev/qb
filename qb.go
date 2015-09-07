@@ -94,13 +94,14 @@ func (b *Builder) SetOffset(n int) *Builder {
 
 //SelectAll return a query to select all data from sql.
 func (b *Builder) SelectAll() string {
-	query := b.initialQuery() + " " + b.orderByQuery()
+	query := b.initialQuery() + b.orderByQuery()
 	return query
 }
 
 //SelectByPK return a query with the where clause from PrimaryKey.
 func (b *Builder) SelectByPK() string {
-	query := b.initialQuery() + " " + b.pkWhereQuery()
+	where, _ := b.pkWhereQuery(1)
+	query := b.initialQuery() + where
 	return query
 }
 
@@ -125,7 +126,7 @@ func (b *Builder) orderByQuery() string {
 			}
 		}
 	}
-	orderBy := "ORDER BY " + strings.Join(b.orderBy, ",")
+	orderBy := " ORDER BY " + strings.Join(b.orderBy, ",")
 	return orderBy
 }
 
@@ -138,18 +139,18 @@ func (b *Builder) isOrderByExist(field string) bool {
 	return false
 }
 
-func (b *Builder) pkWhereQuery() string {
+func (b *Builder) pkWhereQuery(starting int) (string, int) {
 	if b.driver == "pq" {
-		return pqWhere(b.t.PrimaryKeys())
+		return pqWhere(b.t.PrimaryKeys(), starting)
 	}
-	return "pkWhereQuery: should not happen"
+	return "pkWhereQuery: unreacheable", 0
 }
 
-func (b *Builder) filterQuery() (where string, args []interface{}) {
+func (b *Builder) filterQuery(starting int) (where string, args []interface{}, next int) {
 	if b.driver == "pq" {
-		return pqFilter(b.filters)
+		return pqFilter(b.filters, starting)
 	}
-	return "filterQuery: should not happen", nil
+	return
 }
 
 //Error check the query
@@ -168,8 +169,8 @@ func (b *Builder) Error() error {
 
 //Query return a query without checking the error.
 func (b *Builder) Query() (query string, args []interface{}) {
-	where, args := b.filterQuery()
-	query = b.initialQuery() + " " + where + " " + b.orderByQuery()
+	where, args, _ := b.filterQuery(1)
+	query = b.initialQuery() + where + b.orderByQuery()
 	if b.limit > 0 {
 		query += " LIMIT " + strconv.Itoa(b.limit)
 	}
@@ -188,16 +189,6 @@ func (b *Builder) Reset() *Builder {
 	b.limit = 0
 	b.offset = 0
 	return b
-}
-
-//InsertQuery Return a query to insert to the database.
-func (b *Builder) InsertQuery() string {
-	n := len(b.t.Fields())
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)",
-		b.t.TableName(),
-		strings.Join(b.t.Fields(), ","),
-		b.makePlaceholder(n))
-	return query
 }
 
 func (b *Builder) makePlaceholder(n int) string {

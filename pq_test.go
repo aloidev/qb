@@ -11,6 +11,6 @@ func BenchmarkPqFilter(b *testing.B) {
 		{field: "descr", op: "=", value: "desc"},
 	}
 	for i := 0; i < b.N; i++ {
-		pqFilter(fields)
+		pqFilter(fields, 1)
 	}
 }

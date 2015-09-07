@@ -134,7 +134,7 @@ func populateData(t *testing.T, data []pqEmp) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := NewPQ(tbl, true)
+	b := NewPQUpdate(tbl)
 	insertQ := b.InsertQuery()
 	for i, v := range data {
 		_, err := db.Exec(insertQ, v.ID, v.Name, v.Child, v.JoinDate)

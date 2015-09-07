@@ -9,6 +9,7 @@ package qb
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -34,6 +35,8 @@ type Builder struct {
 	fields   []string
 	orderBy  []string
 	filters  []filter
+	limit    int
+	offset   int
 }
 
 //NewPQ create a builder for PostgreSQL database.
@@ -79,6 +82,16 @@ func (b *Builder) OrderBy(fieldName ...string) *Builder {
 	return b
 }
 
+func (b *Builder) SetLimit(n int) *Builder {
+	b.limit = n
+	return b
+}
+
+func (b *Builder) SetOffset(n int) *Builder {
+	b.offset = n
+	return b
+}
+
 //SelectAll return a query to select all data from sql.
 func (b *Builder) SelectAll() string {
 	query := b.initialQuery() + " " + b.orderByQuery()
@@ -103,9 +116,26 @@ func (b *Builder) initialQuery() string {
 }
 
 func (b *Builder) orderByQuery() string {
-	b.orderBy = append(b.orderBy, b.t.PrimaryKeys()...)
+	if len(b.orderBy) == 0 {
+		b.orderBy = append(b.orderBy, b.t.PrimaryKeys()...)
+	} else {
+		for _, v := range b.t.PrimaryKeys() {
+			if !b.isOrderByExist(v) {
+				b.orderBy = append(b.orderBy, v)
+			}
+		}
+	}
 	orderBy := "ORDER BY " + strings.Join(b.orderBy, ",")
 	return orderBy
+}
+
+func (b *Builder) isOrderByExist(field string) bool {
+	for _, v := range b.orderBy {
+		if field == v {
+			return true
+		}
+	}
+	return false
 }
 
 func (b *Builder) pkWhereQuery() string {
@@ -139,7 +169,13 @@ func (b *Builder) Error() error {
 //Query return a query without checking the error.
 func (b *Builder) Query() (query string, args []interface{}) {
 	where, args := b.filterQuery()
-	query = b.initialQuery() + " " + where
+	query = b.initialQuery() + " " + where + " " + b.orderByQuery()
+	if b.limit > 0 {
+		query += " LIMIT " + strconv.Itoa(b.limit)
+	}
+	if b.offset > 0 {
+		query += " OFFSET " + strconv.Itoa(b.offset)
+	}
 	return query, args
 }
 
@@ -149,6 +185,8 @@ func (b *Builder) Reset() *Builder {
 	b.fields = []string{}
 	b.filters = []filter{}
 	b.orderBy = []string{}
+	b.limit = 0
+	b.offset = 0
 	return b
 }
 

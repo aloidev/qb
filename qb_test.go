@@ -81,11 +81,11 @@ func TestSetFilterQuery(t *testing.T) {
 	}
 	b := newBuilder(t, Emp{}, false)
 	b.SetFilter("age", "=", 20)
-	wantQ := "SELECT * FROM emp WHERE age = $1"
+	wantQ := "SELECT * FROM emp WHERE age = $1 ORDER BY id"
 	wantA := []interface{}{20}
 	testQuery(t, b, wantQ, wantA)
 	b.SetFilter("Name", "=", "me")
-	wantQ = "SELECT * FROM emp WHERE age = $1 AND name = $2"
+	wantQ = "SELECT * FROM emp WHERE age = $1 AND name = $2 ORDER BY id"
 	wantA = []interface{}{20, "me"}
 	testQuery(t, b, wantQ, wantA)
 }
@@ -98,7 +98,7 @@ func TestSetRangeQuery(t *testing.T) {
 	}
 	b := newBuilder(t, Emp{}, false)
 	b.SetRange("Name", "a", "b")
-	wantQ := "SELECT * FROM emp WHERE name >= $1 AND name <= $2"
+	wantQ := "SELECT * FROM emp WHERE name >= $1 AND name <= $2 ORDER BY id"
 	wantA := []interface{}{"a", "b"}
 	testQuery(t, b, wantQ, wantA)
 }
@@ -111,6 +111,31 @@ func testQuery(t *testing.T, b *Builder, wantQ string, wantA []interface{}) {
 	if !reflect.DeepEqual(gotA, wantA) {
 		t.Errorf("got args: %v want %v", gotA, wantA)
 	}
+}
+
+func TestSetLimitAndOffset(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	b.SetRange("Name", "a", "b")
+	b.SetLimit(5)
+	wantQ := "SELECT * FROM emp WHERE name >= $1 AND name <= $2 ORDER BY id LIMIT 5"
+	wantA := []interface{}{"a", "b"}
+	testQuery(t, b, wantQ, wantA)
+
+	b.Reset()
+	b.SetRange("Name", "a", "b")
+	b.SetOffset(2)
+	wantQ = "SELECT * FROM emp WHERE name >= $1 AND name <= $2 ORDER BY id OFFSET 2"
+	wantA = []interface{}{"a", "b"}
+	testQuery(t, b, wantQ, wantA)
+	b.SetLimit(3)
+	wantQ = "SELECT * FROM emp WHERE name >= $1 AND name <= $2 ORDER BY id LIMIT 3 OFFSET 2"
+	wantA = []interface{}{"a", "b"}
+	testQuery(t, b, wantQ, wantA)
 }
 
 func TestError(t *testing.T) {
@@ -135,13 +160,13 @@ func TestReset(t *testing.T) {
 	b := newBuilder(t, Emp{}, false)
 	b.SetFilter("age", "=", 20)
 	b.SetFields("ID")
-	wantQ := "SELECT id FROM emp WHERE age = $1"
+	wantQ := "SELECT id FROM emp WHERE age = $1 ORDER BY id"
 	wantA := []interface{}{20}
 	testQuery(t, b, wantQ, wantA)
 	b.Reset()
 	b.SetFields("name")
 	b.SetFilter("Name", "=", "me")
-	wantQ = "SELECT name FROM emp WHERE name = $1"
+	wantQ = "SELECT name FROM emp WHERE name = $1 ORDER BY id"
 	wantA = []interface{}{"me"}
 	testQuery(t, b, wantQ, wantA)
 }

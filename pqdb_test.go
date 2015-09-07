@@ -33,13 +33,7 @@ func TestWithPQDatabase(t *testing.T) {
 	}
 	// openPQDB(t)
 	// createTable(t)
-	data := []pqEmp{
-		{"A1", "AN1", 0, newTime(2010, time.January, 1)},
-		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
-		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
-		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
-	}
-	preparePqTest(t, data)
+	data := preparePqTest(t)
 	tbl, err := NewTable("emp", data[0])
 	if err != nil {
 		t.Errorf("create table err: %v", err)
@@ -65,12 +59,19 @@ func TestWithPQDatabase(t *testing.T) {
 
 var once sync.Once
 
-func preparePqTest(t *testing.T, data []pqEmp) {
+func preparePqTest(t *testing.T) []pqEmp {
+	data := []pqEmp{
+		{"A1", "AN1", 0, newTime(2010, time.January, 1)},
+		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
+		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
+		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
+	}
 	once.Do(func() {
 		openPQDB(t)
 		createTable(t)
 		populateData(t, data)
 	})
+	return data
 }
 
 func testSetFilterPQ(t *testing.T, b *Builder, want pqEmp) {

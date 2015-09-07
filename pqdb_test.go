@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -30,15 +31,15 @@ func TestWithPQDatabase(t *testing.T) {
 	if !*pqtest {
 		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
 	}
-	openPQDB(t)
-	createTable(t)
+	// openPQDB(t)
+	// createTable(t)
 	data := []pqEmp{
 		{"A1", "AN1", 0, newTime(2010, time.January, 1)},
 		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
 		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
 		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
 	}
-	populateData(t, data)
+	preparePqTest(t, data)
 	tbl, err := NewTable("emp", data[0])
 	if err != nil {
 		t.Errorf("create table err: %v", err)
@@ -62,6 +63,16 @@ func TestWithPQDatabase(t *testing.T) {
 	testSetFilterPQ(t, b, want)
 }
 
+var once sync.Once
+
+func preparePqTest(t *testing.T, data []pqEmp) {
+	once.Do(func() {
+		openPQDB(t)
+		createTable(t)
+		populateData(t, data)
+	})
+}
+
 func testSetFilterPQ(t *testing.T, b *Builder, want pqEmp) {
 	query, args := b.Query()
 	got := queryRowPQ(t, query, args...)
@@ -81,6 +92,7 @@ func queryRowPQ(t *testing.T, query string, args ...interface{}) pqEmp {
 	}
 	return res
 }
+
 func init() {
 	flag.Parse()
 }

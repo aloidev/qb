@@ -65,6 +65,11 @@ func preparePqTest(t *testing.T) []pqEmp {
 		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
 		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
 		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
+		{"D5", "DN5", 0, newTime(2010, time.January, 1)},
+		{"E6", "EN6", 1, newTime(2010, time.February, 2)},
+		{"F7", "FN7", 2, newTime(2010, time.March, 3)},
+		{"G8", "GN8", 3, newTime(2010, time.April, 3)},
+		{"H9", "HN9", 3, newTime(2010, time.April, 3)},
 	}
 	once.Do(func() {
 		openPQDB(t)

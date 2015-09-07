@@ -113,6 +113,19 @@ func testQuery(t *testing.T, b *Builder, wantQ string, wantA []interface{}) {
 	}
 }
 
+func TestOrderBy(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	b.SetRange("Name", "a", "b").OrderBy("id", "name")
+	wantQ := "SELECT * FROM emp WHERE name >= $1 AND name <= $2 ORDER BY id,name"
+	wantA := []interface{}{"a", "b"}
+	testQuery(t, b, wantQ, wantA)
+}
+
 func TestSetLimitAndOffset(t *testing.T) {
 	type Emp struct {
 		ID   string `pk:"1"`
@@ -149,6 +162,18 @@ func TestError(t *testing.T) {
 	testError(t, b, false)
 	b.SetFilter("FieldNotExist", "=", "b")
 	testError(t, b, true)
+
+	b.Reset()
+	b.SetFields("id", "name")
+	testError(t, b, false)
+	b.SetFields("FieldNotExist")
+	testError(t, b, true)
+
+	b.Reset()
+	b.OrderBy("id", "name")
+	testError(t, b, false)
+	b.OrderBy("FieldNotExist")
+	testError(t, b, true)
 }
 
 func TestReset(t *testing.T) {
@@ -169,6 +194,20 @@ func TestReset(t *testing.T) {
 	wantQ = "SELECT name FROM emp WHERE name = $1 ORDER BY id"
 	wantA = []interface{}{"me"}
 	testQuery(t, b, wantQ, wantA)
+}
+
+func TestInsertQuery(t *testing.T) {
+	type Emp struct {
+		ID   string `pk:"1"`
+		Name string
+		Age  int
+	}
+	b := newBuilder(t, Emp{}, false)
+	got := b.InsertQuery()
+	want := "INSERT INTO emp (id,name,age) VALUES ($1,$2,$3)"
+	if got != want {
+		t.Errorf("got: %s want %s", got, want)
+	}
 }
 
 func testError(t *testing.T, b *Builder, err bool) {

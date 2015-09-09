@@ -27,8 +27,8 @@ type filter struct {
 	value interface{}
 }
 
-//Builder is
-type Builder struct {
+//Select is builder to construct Select Query.
+type Select struct {
 	explicit bool
 	t        Tabler
 	driver   string
@@ -39,99 +39,102 @@ type Builder struct {
 	offset   int
 }
 
-//NewPQ create a builder for PostgreSQL database.
+//NewPQSelect create a builder for PostgreSQL database.
 //If explicit, when fields is not specified the builder will return query with the fields,
 //instead of *.
-func NewPQ(t Tabler, explicit bool) *Builder {
-	return &Builder{explicit: explicit, t: t, driver: "pq"}
+func NewPQSelect(t Tabler, explicit bool) *Select {
+	return &Select{explicit: explicit, t: t, driver: "pq"}
 }
 
 //SetFields set the fields to retrieve from table.
-func (b *Builder) SetFields(fieldName ...string) *Builder {
+func (s *Select) SetFields(fieldName ...string) *Select {
 	for _, field := range fieldName {
-		b.fields = append(b.fields, strings.ToLower(field))
+		s.fields = append(s.fields, strings.ToLower(field))
 	}
-	return b
+	return s
 }
 
 //SetFilter set the where clause for the query, filter will be AND with other filter.
-func (b *Builder) SetFilter(fieldName string, op string, value interface{}) *Builder {
+func (s *Select) SetFilter(fieldName string, op string, value interface{}) *Select {
 	f := filter{
 		field: strings.ToLower(fieldName),
 		op:    op,
 		value: value,
 	}
-	b.filters = append(b.filters, f)
-	return b
+	s.filters = append(s.filters, f)
+	return s
 }
 
 //SetRange is a convenient wrapper for setfilter.
 //SetRange is equivalent with 2 SetFilter call:
 //	SetFilter(field,">=",starting)
 //	SetFilter(field,"<=",ending)
-func (b *Builder) SetRange(fieldName string, starting, ending interface{}) *Builder {
-	b.SetFilter(fieldName, ">=", starting)
-	b.SetFilter(fieldName, "<=", ending)
-	return b
+func (s *Select) SetRange(fieldName string, starting, ending interface{}) *Select {
+	s.SetFilter(fieldName, ">=", starting)
+	s.SetFilter(fieldName, "<=", ending)
+	return s
 }
 
 //OrderBy set the order by for the query.
 //If OrderBy is not called the query will orderBy primaryKey fields.
-func (b *Builder) OrderBy(fieldName ...string) *Builder {
-	b.orderBy = fieldName
-	return b
+func (s *Select) OrderBy(fieldName ...string) *Select {
+	s.orderBy = fieldName
+	return s
 }
 
-func (b *Builder) SetLimit(n int) *Builder {
-	b.limit = n
-	return b
+//SetLimit set the limit for the query, if the limit is not specified select
+//will produce a query that get all the records that match with query.
+func (s *Select) SetLimit(n int) *Select {
+	s.limit = n
+	return s
 }
 
-func (b *Builder) SetOffset(n int) *Builder {
-	b.offset = n
-	return b
+//SetOffset set the offset for the query.
+func (s *Select) SetOffset(n int) *Select {
+	s.offset = n
+	return s
 }
 
 //SelectAll return a query to select all data from sql.
-func (b *Builder) SelectAll() string {
-	query := b.initialQuery() + b.orderByQuery()
+func (s *Select) SelectAll() string {
+	query := s.initialQuery() + s.orderByQuery()
 	return query
 }
 
 //SelectByPK return a query with the where clause from PrimaryKey.
-func (b *Builder) SelectByPK() string {
-	where, _ := b.pkWhereQuery(1)
-	query := b.initialQuery() + where
+func (s *Select) SelectByPK() string {
+	where, _ := s.pkWhereQuery(1)
+	query := s.initialQuery() + where
 	return query
 }
 
-func (b *Builder) initialQuery() string {
-	if len(b.fields) == 0 {
-		if !b.explicit {
-			return "SELECT * FROM " + b.t.TableName()
+func (s *Select) initialQuery() string {
+	if len(s.fields) == 0 {
+		if !s.explicit {
+			return "SELECT * FROM " + s.t.TableName()
 		}
-		b.fields = b.t.Fields()
+		s.fields = s.t.Fields()
 	}
-	query := "SELECT " + strings.Join(b.fields, ",") + " FROM " + b.t.TableName()
+	query := "SELECT " + strings.Join(s.fields, ",") + " FROM " + s.t.TableName()
 	return query
 }
 
-func (b *Builder) orderByQuery() string {
-	if len(b.orderBy) == 0 {
-		b.orderBy = append(b.orderBy, b.t.PrimaryKeys()...)
+func (s *Select) orderByQuery() string {
+	if len(s.orderBy) == 0 {
+		s.orderBy = append(s.orderBy, s.t.PrimaryKeys()...)
 	} else {
-		for _, v := range b.t.PrimaryKeys() {
-			if !b.isOrderByExist(v) {
-				b.orderBy = append(b.orderBy, v)
+		for _, v := range s.t.PrimaryKeys() {
+			if !s.isOrderByExist(v) {
+				s.orderBy = append(s.orderBy, v)
 			}
 		}
 	}
-	orderBy := " ORDER BY " + strings.Join(b.orderBy, ",")
+	orderBy := " ORDER BY " + strings.Join(s.orderBy, ",")
 	return orderBy
 }
 
-func (b *Builder) isOrderByExist(field string) bool {
-	for _, v := range b.orderBy {
+func (s *Select) isOrderByExist(field string) bool {
+	for _, v := range s.orderBy {
 		if field == v {
 			return true
 		}
@@ -139,97 +142,97 @@ func (b *Builder) isOrderByExist(field string) bool {
 	return false
 }
 
-func (b *Builder) pkWhereQuery(starting int) (string, int) {
-	if b.driver == "pq" {
-		return pqWhere(b.t.PrimaryKeys(), starting)
+func (s *Select) pkWhereQuery(starting int) (string, int) {
+	if s.driver == "pq" {
+		return pqWhere(s.t.PrimaryKeys(), starting)
 	}
 	return "pkWhereQuery: unreacheable", 0
 }
 
-func (b *Builder) filterQuery(starting int) (where string, args []interface{}, next int) {
-	if b.driver == "pq" {
-		return pqFilter(b.filters, starting)
+func (s *Select) filterQuery(starting int) (where string, args []interface{}, next int) {
+	if s.driver == "pq" {
+		return pqFilter(s.filters, starting)
 	}
 	return
 }
 
 //Error check the query
-func (b *Builder) Error() error {
-	if err := b.fieldError(); err != nil {
+func (s *Select) Error() error {
+	if err := s.fieldError(); err != nil {
 		return err
 	}
-	if err := b.orderByError(); err != nil {
+	if err := s.orderByError(); err != nil {
 		return err
 	}
-	if err := b.filterError(); err != nil {
+	if err := s.filterError(); err != nil {
 		return err
 	}
 	return nil
 }
 
 //Query return a query without checking the error.
-func (b *Builder) Query() (query string, args []interface{}) {
-	where, args, _ := b.filterQuery(1)
-	query = b.initialQuery() + where + b.orderByQuery()
-	if b.limit > 0 {
-		query += " LIMIT " + strconv.Itoa(b.limit)
+func (s *Select) Query() (query string, args []interface{}) {
+	where, args, _ := s.filterQuery(1)
+	query = s.initialQuery() + where + s.orderByQuery()
+	if s.limit > 0 {
+		query += " LIMIT " + strconv.Itoa(s.limit)
 	}
-	if b.offset > 0 {
-		query += " OFFSET " + strconv.Itoa(b.offset)
+	if s.offset > 0 {
+		query += " OFFSET " + strconv.Itoa(s.offset)
 	}
 	return query, args
 }
 
 //Reset zeroes the fields,filters and orderBy so the builder can be reuse to construct new query
 //without include the old fields,filters and orderBy.
-func (b *Builder) Reset() *Builder {
-	b.fields = []string{}
-	b.filters = []filter{}
-	b.orderBy = []string{}
-	b.limit = 0
-	b.offset = 0
-	return b
+func (s *Select) Reset() *Select {
+	s.fields = []string{}
+	s.filters = []filter{}
+	s.orderBy = []string{}
+	s.limit = 0
+	s.offset = 0
+	return s
 }
 
-func (b *Builder) makePlaceholder(n int) string {
-	if b.driver == "pq" {
+func (s *Select) makePlaceholder(n int) string {
+	if s.driver == "pq" {
 		return pqMakePlaceholder(n)
 	}
 	return "makePlaceholder: should not happen"
 }
 
-func (b *Builder) fieldError() error {
-	for _, field := range b.fields {
-		if !b.fieldExist(field) {
+func (s *Select) fieldError() error {
+	for _, field := range s.fields {
+		if !s.fieldExist(field) {
 			return fmt.Errorf("field %s doesn't exist", field)
 		}
 	}
 	return nil
 }
 
-func (b *Builder) orderByError() error {
-	for _, field := range b.orderBy {
-		if !b.fieldExist(field) {
+func (s *Select) orderByError() error {
+	for _, field := range s.orderBy {
+		if !s.fieldExist(field) {
 			return fmt.Errorf("orderBy field %s doesn't exist", field)
 		}
 	}
 	return nil
 }
 
-func (b *Builder) filterError() error {
-	for _, filter := range b.filters {
-		if !b.fieldExist(filter.field) {
+func (s *Select) filterError() error {
+	for _, filter := range s.filters {
+		if !s.fieldExist(filter.field) {
 			return fmt.Errorf("field %s doesn't exist", filter.field)
 		}
-		if err := b.isValidOp(filter.op); err != nil {
+		if err := s.isValidOp(filter.op); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (b *Builder) fieldExist(field string) bool {
-	for _, val := range b.t.Fields() {
+func (s *Select) fieldExist(field string) bool {
+	for _, val := range s.t.Fields() {
 		if val == field {
 			return true
 		}
@@ -237,7 +240,7 @@ func (b *Builder) fieldExist(field string) bool {
 	return false
 }
 
-func (b *Builder) isValidOp(op string) error {
+func (s *Select) isValidOp(op string) error {
 	if op == "=" || op == "<" || op == ">" || op == ">=" || op == "<=" {
 		return nil
 	}
@@ -245,9 +248,9 @@ func (b *Builder) isValidOp(op string) error {
 }
 
 //QueryMust will panic when builder return an error.
-func (b *Builder) QueryMust() (query string, args []interface{}) {
-	if err := b.Error(); err != nil {
+func (s *Select) QueryMust() (query string, args []interface{}) {
+	if err := s.Error(); err != nil {
 		panic(err)
 	}
-	return b.Query()
+	return s.Query()
 }

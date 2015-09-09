@@ -38,7 +38,7 @@ func TestWithPQDatabase(t *testing.T) {
 	if err != nil {
 		t.Errorf("create table err: %v", err)
 	}
-	b := NewPQ(tbl, true)
+	b := NewPQSelect(tbl, true)
 	// b.SetFields("id", "name", "child")
 	b.SetFilter("id", "=", "A1")
 	want := data[0]
@@ -79,7 +79,7 @@ func preparePqTest(t *testing.T) []pqEmp {
 	return data
 }
 
-func testSetFilterPQ(t *testing.T, b *Builder, want pqEmp) {
+func testSetFilterPQ(t *testing.T, b *Select, want pqEmp) {
 	query, args := b.Query()
 	got := queryRowPQ(t, query, args...)
 

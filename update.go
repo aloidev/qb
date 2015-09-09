@@ -57,7 +57,7 @@ func (u *Update) SetFilter(field, op string, value interface{}) *Update {
 
 //Query return the query and the args to execute again the database.
 //After query create, the update will do a reset it's state to be reuse.
-func (u *Update) Query() (query string, args []interface{}) {
+func (u *Update) UpdateQuery() (query string, args []interface{}) {
 	if len(u.updated) == 0 {
 		return "", nil
 	}

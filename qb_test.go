@@ -29,13 +29,13 @@ func TestSelectAll(t *testing.T) {
 		t.Errorf("got err = %v want nil", err)
 	}
 
-	b := NewPQ(tbl, false)
+	b := NewPQSelect(tbl, false)
 	got := b.SelectAll()
 	want := "SELECT * FROM simple ORDER BY id"
 	if got != want {
 		t.Errorf("got query = %s want %s", got, want)
 	}
-	b = NewPQ(tbl, true)
+	b = NewPQSelect(tbl, true)
 	got = b.SelectAll()
 	want = "SELECT id,name FROM simple ORDER BY id"
 	if got != want {
@@ -103,7 +103,7 @@ func TestSetRangeQuery(t *testing.T) {
 	testQuery(t, b, wantQ, wantA)
 }
 
-func testQuery(t *testing.T, b *Builder, wantQ string, wantA []interface{}) {
+func testQuery(t *testing.T, b *Select, wantQ string, wantA []interface{}) {
 	gotQ, gotA := b.Query()
 	if gotQ != wantQ {
 		t.Errorf("got query: %s \n             want %s", gotQ, wantQ)
@@ -196,7 +196,7 @@ func TestReset(t *testing.T) {
 	testQuery(t, b, wantQ, wantA)
 }
 
-func testError(t *testing.T, b *Builder, err bool) {
+func testError(t *testing.T, b *Select, err bool) {
 	got := b.Error()
 	if err {
 		if got == nil {
@@ -209,12 +209,12 @@ func testError(t *testing.T, b *Builder, err bool) {
 	}
 }
 
-func newBuilder(t *testing.T, tbl interface{}, explicit bool) *Builder {
+func newBuilder(t *testing.T, tbl interface{}, explicit bool) *Select {
 	ti, err := NewTable("", tbl)
 	if err != nil {
 		t.Errorf("got err : %v want nil", err)
 	}
 
-	b := NewPQ(ti, explicit)
+	b := NewPQSelect(ti, explicit)
 	return b
 }

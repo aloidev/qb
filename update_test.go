@@ -64,7 +64,7 @@ func testDeleteQuery(t *testing.T, b *Update, wantQ string, wantA []interface{})
 }
 
 func testUpdateQuery(t *testing.T, b *Update, wantQ string, wantA []interface{}) {
-	gotQ, gotA := b.Query()
+	gotQ, gotA := b.UpdateQuery()
 	if gotQ != wantQ {
 		t.Errorf("got: %s\n        want %s", gotQ, wantQ)
 	}

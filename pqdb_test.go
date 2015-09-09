@@ -27,19 +27,16 @@ type pqEmp struct {
 	JoinDate time.Time
 }
 
-func TestWithPQDatabase(t *testing.T) {
+func TestSelectWithPQDatabase(t *testing.T) {
 	if !*pqtest {
 		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
 	}
-	// openPQDB(t)
-	// createTable(t)
 	data := preparePqTest(t)
 	tbl, err := NewTable("emp", data[0])
 	if err != nil {
 		t.Errorf("create table err: %v", err)
 	}
 	b := NewPQSelect(tbl, true)
-	// b.SetFields("id", "name", "child")
 	b.SetFilter("id", "=", "A1")
 	want := data[0]
 	testSetFilterPQ(t, b, want)
@@ -55,28 +52,6 @@ func TestWithPQDatabase(t *testing.T) {
 	b.SetFilter("joinDate", "=", newTime(2010, time.April, 3))
 	want = data[3]
 	testSetFilterPQ(t, b, want)
-}
-
-var once sync.Once
-
-func preparePqTest(t *testing.T) []pqEmp {
-	data := []pqEmp{
-		{"A1", "AN1", 0, newTime(2010, time.January, 1)},
-		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
-		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
-		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
-		{"D5", "DN5", 0, newTime(2010, time.January, 1)},
-		{"E6", "EN6", 1, newTime(2010, time.February, 2)},
-		{"F7", "FN7", 2, newTime(2010, time.March, 3)},
-		{"G8", "GN8", 3, newTime(2010, time.April, 3)},
-		{"H9", "HN9", 3, newTime(2010, time.April, 3)},
-	}
-	once.Do(func() {
-		openPQDB(t)
-		createTable(t)
-		populateData(t, data)
-	})
-	return data
 }
 
 func testSetFilterPQ(t *testing.T, b *Select, want pqEmp) {
@@ -146,4 +121,26 @@ func populateData(t *testing.T, data []pqEmp) {
 
 func newTime(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+}
+
+var once sync.Once
+
+func preparePqTest(t *testing.T) []pqEmp {
+	data := []pqEmp{
+		{"A1", "AN1", 0, newTime(2010, time.January, 1)},
+		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
+		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
+		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
+		{"D5", "DN5", 0, newTime(2010, time.January, 1)},
+		{"E6", "EN6", 1, newTime(2010, time.February, 2)},
+		{"F7", "FN7", 2, newTime(2010, time.March, 3)},
+		{"G8", "GN8", 3, newTime(2010, time.April, 3)},
+		{"H9", "HN9", 3, newTime(2010, time.April, 3)},
+	}
+	once.Do(func() {
+		openPQDB(t)
+		createTable(t)
+		populateData(t, data)
+	})
+	return data
 }

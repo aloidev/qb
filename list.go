@@ -3,6 +3,10 @@ package qb
 import (
 	"database/sql"
 	"errors"
+	"fmt"
+	"reflect"
+	"strconv"
+	"strings"
 )
 
 //ErrDone is an error to signal no more rows.
@@ -54,6 +58,7 @@ func (l *List) Get(qe QueryExecer) error {
 //dst must be pointer to struct or implement ScanArger.
 func (l *List) Next(dst interface{}) error {
 	//TODO: if no records match the query, list will return ErrDone instead of sql.ErrNoRows
+	//TODO: SelectByPK is not filled l.s.fields
 	if l.rows.Next() {
 		if sa, ok := dst.(ScanArger); ok {
 			return l.scanWithArger(sa)
@@ -75,11 +80,144 @@ func (l *List) scanWithArger(dst ScanArger) error {
 }
 
 func (l *List) scanWithReflect(dst interface{}) error {
+	//TODO: save the information on creating table so when creating args can use that information.
+	v := reflect.ValueOf(dst)
+	if v.Kind() != reflect.Ptr || v.IsNil() {
+		return errors.New("dst must be pointer to struct")
+	}
+	ve := v.Elem()
+	n := ve.NumField()
+	if n <= 0 || n < len(l.s.fields) {
+		return errors.New("destination field not enough")
+	}
+
+	var args []interface{}
+	for _, field := range l.s.fields {
+		dstF := ve.FieldByNameFunc(func(dstName string) bool {
+			if strings.ToLower(dstName) == field {
+				return true
+			}
+			return false
+		})
+		if dstF.IsValid() {
+			args = append(args, fieldScanner{dv: dstF})
+		}
+	}
+	if len(args) != len(l.s.fields) {
+		return errors.New("destination field not enough")
+	}
+	if err := l.rows.Scan(args...); err != nil {
+		l.rows.Close()
+		return err
+	}
 	return nil
+}
+
+func (l *List) getFieldArgsPos(field string) (int, bool) {
+	for i, v := range l.s.fields {
+		if v == field {
+			return i, true
+		}
+	}
+	return 0, false
 }
 
 //Close is to call close on the sql.Rows,
 //rows on the list follow the rule on standard database sql package.
 func (l *List) Close() error {
 	return l.rows.Close()
+}
+
+type fieldScanner struct {
+	dv reflect.Value
+}
+
+func (sc fieldScanner) Scan(src interface{}) error {
+	if !sc.dv.CanSet() {
+		return errors.New("field is not settable")
+	}
+	switch sc.dv.Kind() {
+	case reflect.Ptr:
+		if src == nil {
+			sc.dv.Set(reflect.Zero(sc.dv.Type()))
+			return nil
+		} else {
+			sc.dv.Set(reflect.New(sc.dv.Type().Elem()))
+			// return conve(s.dv.Interface(), src) //TODO:
+		}
+	case reflect.String:
+		s := asString(src)
+		sc.dv.SetString(s)
+		return nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		s := asString(src)
+		i64, err := strconv.ParseInt(s, 10, sc.dv.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("converting string %q to a %s: %v", s, sc.dv.Kind(), err)
+		}
+		sc.dv.SetInt(i64)
+		return nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		s := asString(src)
+		u64, err := strconv.ParseUint(s, 10, sc.dv.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("converting string %q to a %s: %v", s, sc.dv.Kind(), err)
+		}
+		sc.dv.SetUint(u64)
+		return nil
+	case reflect.Float32, reflect.Float64:
+		s := asString(src)
+		f64, err := strconv.ParseFloat(s, sc.dv.Type().Bits())
+		if err != nil {
+			return fmt.Errorf("converting string %q to a %s: %v", s, sc.dv.Kind(), err)
+		}
+		sc.dv.SetFloat(f64)
+		return nil
+	}
+
+	return fmt.Errorf("unsupported driver -> Scan pair: %T -> %T", src, sc.dv)
+}
+
+//copied from GO standard library database.sql package
+func asString(src interface{}) string {
+	switch v := src.(type) {
+	case string:
+		return v
+	case []byte:
+		return string(v)
+	}
+	rv := reflect.ValueOf(src)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(rv.Int(), 10)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(rv.Uint(), 10)
+	case reflect.Float64:
+		return strconv.FormatFloat(rv.Float(), 'g', -1, 64)
+	case reflect.Float32:
+		return strconv.FormatFloat(rv.Float(), 'g', -1, 32)
+	case reflect.Bool:
+		return strconv.FormatBool(rv.Bool())
+	}
+	return fmt.Sprintf("%v", src)
+}
+
+//copied from GO standard library database.sql package
+func asBytes(buf []byte, rv reflect.Value) (b []byte, ok bool) {
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.AppendInt(buf, rv.Int(), 10), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.AppendUint(buf, rv.Uint(), 10), true
+	case reflect.Float32:
+		return strconv.AppendFloat(buf, rv.Float(), 'g', -1, 32), true
+	case reflect.Float64:
+		return strconv.AppendFloat(buf, rv.Float(), 'g', -1, 64), true
+	case reflect.Bool:
+		return strconv.AppendBool(buf, rv.Bool()), true
+	case reflect.String:
+		s := rv.String()
+		return append(buf, s...), true
+	}
+	return
 }

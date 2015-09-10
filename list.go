@@ -102,6 +102,11 @@ func (l *List) scanWithReflect(dst interface{}) error {
 		})
 		if dstS, ok := dstF.Interface().(sql.Scanner); ok {
 			args = append(args, dstS)
+			continue
+		}
+		if dstF.Kind() == reflect.Ptr {
+			args = append(args, dstF.Interface())
+			continue
 		}
 		if dstF.IsValid() {
 			args = append(args, fieldScanner{dv: dstF})
@@ -143,14 +148,6 @@ func (sc fieldScanner) Scan(src interface{}) error {
 		return errors.New("field is not settable")
 	}
 	switch sc.dv.Kind() {
-	case reflect.Ptr:
-		if src == nil {
-			sc.dv.Set(reflect.Zero(sc.dv.Type()))
-			return nil
-		} else {
-			sc.dv.Set(reflect.New(sc.dv.Type().Elem()))
-			// return conve(s.dv.Interface(), src) //TODO:
-		}
 	case reflect.String:
 		s := asString(src)
 		sc.dv.SetString(s)

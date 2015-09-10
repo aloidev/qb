@@ -3,6 +3,7 @@ package qb
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 type pqEmpArger struct {
@@ -58,6 +59,7 @@ func TestListUsingReflec(t *testing.T) {
 	// emp.SetFields("id", "name", "child")
 	data := preparePqTest(t)
 	want := data[1]
+	// got := new(pqEmp)
 	checkListNextUsingReflect(t, emp, want)
 }
 
@@ -80,8 +82,65 @@ func checkListNextUsingReflect(t *testing.T, emp *Select, want pqEmp) {
 	if err != nil {
 		t.Error(err)
 	}
+
 	got.JoinDate = got.JoinDate.UTC()
 	checkResult(t, emp, *got, want)
+}
+
+type pqEmpPtr struct {
+	ID       *string `pk:"1"`
+	Name     string
+	Child    *int
+	JoinDate *time.Time
+}
+
+func TestListUsingReflecPtr(t *testing.T) {
+	if !*pqtest {
+		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
+	tbl, err := NewTable("emp", pqEmpPtr{})
+	if err != nil {
+		t.Errorf("newTable err: %v", err)
+	}
+	emp := NewPQSelect(tbl, true)
+	emp.SetFilter("id", "=", "B2")
+	// emp.SetFields("id", "name", "child")
+	data := preparePqTest(t)
+	want := data[1]
+	checkListNextUsingReflectPtr(t, emp, want)
+}
+
+func checkListNextUsingReflectPtr(t *testing.T, emp *Select, want pqEmp) {
+	empList := NewList(emp)
+	if err := empList.Get(db); err != nil {
+		t.Errorf("list get err: %v", err)
+	}
+	got := new(pqEmpPtr)
+	got.ID = new(string)
+	got.Child = new(int)
+	got.JoinDate = new(time.Time)
+	var err error
+	for {
+		err = empList.Next(got)
+		if err != nil {
+			if err == ErrDone {
+				err = nil
+			}
+			break
+		}
+	}
+	if err != nil {
+		t.Error(err)
+	}
+
+	*got.JoinDate = got.JoinDate.UTC()
+	gotT := pqEmp{
+		ID:       *got.ID,
+		Name:     got.Name,
+		Child:    *got.Child,
+		JoinDate: *got.JoinDate,
+	}
+	checkResult(t, emp, gotT, want)
 }
 
 func checkListNextUsingArger(t *testing.T, emp *Select, want pqEmp) {

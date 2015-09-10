@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //ErrDone is an error to signal no more rows.
@@ -99,6 +100,9 @@ func (l *List) scanWithReflect(dst interface{}) error {
 			}
 			return false
 		})
+		if dstS, ok := dstF.Interface().(sql.Scanner); ok {
+			args = append(args, dstS)
+		}
 		if dstF.IsValid() {
 			args = append(args, fieldScanner{dv: dstF})
 		}
@@ -131,6 +135,8 @@ func (l *List) Close() error {
 type fieldScanner struct {
 	dv reflect.Value
 }
+
+const pqTime = "2006-01-02 15:04:05 +0000 +0000"
 
 func (sc fieldScanner) Scan(src interface{}) error {
 	if !sc.dv.CanSet() {
@@ -173,6 +179,23 @@ func (sc fieldScanner) Scan(src interface{}) error {
 		}
 		sc.dv.SetFloat(f64)
 		return nil
+	case reflect.Struct:
+		if dtt, ok := sc.dv.Interface().(time.Time); ok {
+			s := asString(src)
+			var err error
+			dtt, err = time.Parse(pqTime, s)
+			fmt.Println("is time struct", dtt)
+			// sc.dv.Set(reflect.New(sc.dv.Type()))
+			sc.dv.Set(reflect.ValueOf(dtt))
+			// tt = st
+			return err
+			// s := asString(src)
+			// err := tt.UnmarshalText([]byte(s))
+			// return err
+		} else {
+			_ = dtt
+		}
+		// _ = tt
 	}
 
 	return fmt.Errorf("unsupported driver -> Scan pair: %T -> %T", src, sc.dv)

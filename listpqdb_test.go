@@ -55,7 +55,7 @@ func TestListUsingReflec(t *testing.T) {
 	}
 	emp := NewPQSelect(tbl, true)
 	emp.SetFilter("id", "=", "B2")
-	emp.SetFields("id", "name", "child")
+	// emp.SetFields("id", "name", "child")
 	data := preparePqTest(t)
 	want := data[1]
 	checkListNextUsingReflect(t, emp, want)

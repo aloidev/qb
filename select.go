@@ -46,6 +46,39 @@ func NewPQSelect(t Tabler, explicit bool) *Select {
 	return &Select{explicit: explicit, t: t, driver: "pq"}
 }
 
+//GetByPK execute the query using qe with aargs and save the result to dst.
+//dst must be pointer to struct.
+func (s *Select) GetByPK(qe QueryExecer, dst interface{}, args ...interface{}) error {
+	// row := qe.QueryRow(s.SelectByPK(), args...)
+	// err := scanWithReflection(s.t.Fields(), row, dst)
+	rows, err := qe.Query(s.SelectByPK(), args...)
+	if err != nil {
+		return err
+	}
+	if ok := rows.Next(); ok {
+		if err = scanWithReflection(s.t.Fields(), rows, dst); err != nil {
+			rows.Close()
+			return err
+		}
+	}
+	err = rows.Close()
+	return err
+}
+
+func (s *Select) Get(qe QueryExecer) (*List, error) {
+	//TODO:this error check could be skipped, as driver or the database would check.
+	if err := s.Error(); err != nil {
+		return nil, err
+	}
+	query, args := s.Query()
+	rows, err := qe.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	l := &List{s: s, rows: rows}
+	return l, nil
+}
+
 //SetFields set the fields to retrieve from table.
 func (s *Select) SetFields(fieldName ...string) *Select {
 	for _, field := range fieldName {

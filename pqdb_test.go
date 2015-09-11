@@ -76,6 +76,74 @@ func queryRowPQ(t *testing.T, query string, args ...interface{}) pqEmp {
 	return res
 }
 
+func TestSelectGetByPK(t *testing.T) {
+	data := preparePqTest(t)
+	defer deleteAllPQData(t)
+	emp := newPQSelectTest(t)
+	want := data[0]
+	got := pqEmp{}
+	err := emp.GetByPK(db, &got, "A1")
+	if err != nil {
+		t.Error(err)
+	}
+	checkResult(t, emp, got, want)
+}
+
+func TestUpdateDeleteByPK(t *testing.T) {
+	preparePqTest(t)
+	defer deleteAllPQData(t)
+	empUpdate := newPqUpdateTest(t)
+	err := empUpdate.DeleteByPK(db, "A1")
+	if err != nil {
+		t.Errorf("delete got err: %v want nil", err)
+	}
+	empSelect := newPQSelectTest(t)
+	got := pqEmp{}
+	err = empSelect.GetByPK(db, &got, "A1")
+	if err != nil && err != sql.ErrNoRows {
+		t.Errorf("got err: %v want err: %v", err, sql.ErrNoRows)
+	}
+	want := pqEmp{}
+	checkResult(t, empSelect, got, want)
+}
+
+func TestUpdateDelete(t *testing.T) {
+	data := preparePqTest(t)
+	defer deleteAllPQData(t)
+	empUpdate := newPqUpdateTest(t)
+	err := empUpdate.Delete(db)
+	if err != nil {
+		t.Error(err)
+	}
+	empSelect := newPQSelectTest(t)
+	got := pqEmp{}
+	for _, v := range data {
+		err = empSelect.GetByPK(db, &got, v.ID)
+		if err != nil && err != sql.ErrNoRows {
+			t.Error(err)
+		}
+		want := pqEmp{}
+		checkResult(t, empSelect, got, want)
+	}
+}
+
+func newPQSelectTest(t testing.TB) *Select {
+	tbl, err := NewTable("emp", pqEmp{})
+	if err != nil {
+		t.Errorf("create table err: %v", err)
+	}
+	emp := NewPQSelect(tbl, true)
+	return emp
+}
+func newPqUpdateTest(t testing.TB) *Update {
+	tbl, err := NewTable("emp", pqEmp{})
+	if err != nil {
+		t.Errorf("create table err: %v", err)
+	}
+	emp := NewPQUpdate(tbl)
+	return emp
+}
+
 func init() {
 	flag.Parse()
 }

@@ -49,19 +49,8 @@ func NewPQSelect(t Tabler, explicit bool) *Select {
 //GetByPK execute the query using qe with aargs and save the result to dst.
 //dst must be pointer to struct.
 func (s *Select) GetByPK(qe QueryExecer, dst interface{}, args ...interface{}) error {
-	// row := qe.QueryRow(s.SelectByPK(), args...)
-	// err := scanWithReflection(s.t.Fields(), row, dst)
-	rows, err := qe.Query(s.SelectByPK(), args...)
-	if err != nil {
-		return err
-	}
-	if ok := rows.Next(); ok {
-		if err = scanWithReflection(s.t.Fields(), rows, dst); err != nil {
-			rows.Close()
-			return err
-		}
-	}
-	err = rows.Close()
+	row := qe.QueryRow(s.SelectByPK(), args...)
+	err := scanWithReflection(s.t.Fields(), row, dst)
 	return err
 }
 

@@ -17,9 +17,10 @@ var ErrDone = errors.New("no more rows")
 //sql.DB and sq.Tx from GO standard library implement QueryExecer
 type QueryExecer interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
 }
 
-//Queryer is an interface that can produce query string and the arruments to execute the query.
+//Queryer is an interface that can produce query string and the arguments to execute the query.
 type Queryer interface {
 	Query() (query string, args []interface{})
 }
@@ -64,7 +65,11 @@ func (l *List) Next(dst interface{}) error {
 		if sa, ok := dst.(ScanArger); ok {
 			return l.scanWithArger(sa)
 		}
-		return l.scanWithReflect(dst)
+		// return l.scanWithReflect(dst)
+		if err := scanWithReflection(l.s.fields, l.rows, dst); err != nil {
+			l.rows.Close()
+			return err
+		}
 	}
 	if err := l.rows.Err(); err != nil {
 		return err
@@ -80,20 +85,29 @@ func (l *List) scanWithArger(dst ScanArger) error {
 	return nil
 }
 
-func (l *List) scanWithReflect(dst interface{}) error {
-	//TODO: save the information on creating table so when creating args can use that information.
+//Close is to call close on the sql.Rows,
+//rows on the list follow the rule on standard database sql package.
+func (l *List) Close() error {
+	return l.rows.Close()
+}
+
+type rowScanner interface {
+	Scan(dst ...interface{}) error
+}
+
+func scanWithReflection(fields []string, r rowScanner, dst interface{}) error {
 	v := reflect.ValueOf(dst)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return errors.New("dst must be pointer to struct")
 	}
 	ve := v.Elem()
 	n := ve.NumField()
-	if n <= 0 || n < len(l.s.fields) {
+	if n <= 0 || n < len(fields) {
 		return errors.New("destination field not enough")
 	}
 
 	var args []interface{}
-	for _, field := range l.s.fields {
+	for _, field := range fields {
 		dstF := ve.FieldByNameFunc(func(dstName string) bool {
 			if strings.ToLower(dstName) == field {
 				return true
@@ -112,29 +126,13 @@ func (l *List) scanWithReflect(dst interface{}) error {
 			args = append(args, fieldScanner{dv: dstF})
 		}
 	}
-	if len(args) != len(l.s.fields) {
+	if len(args) != len(fields) {
 		return errors.New("destination field not enough")
 	}
-	if err := l.rows.Scan(args...); err != nil {
-		l.rows.Close()
+	if err := r.Scan(args...); err != nil {
 		return err
 	}
 	return nil
-}
-
-func (l *List) getFieldArgsPos(field string) (int, bool) {
-	for i, v := range l.s.fields {
-		if v == field {
-			return i, true
-		}
-	}
-	return 0, false
-}
-
-//Close is to call close on the sql.Rows,
-//rows on the list follow the rule on standard database sql package.
-func (l *List) Close() error {
-	return l.rows.Close()
 }
 
 type fieldScanner struct {

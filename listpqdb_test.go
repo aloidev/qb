@@ -2,6 +2,7 @@ package qb
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
@@ -38,6 +39,7 @@ func TestListNextUsingScanArger(t *testing.T) {
 	emp := NewPQSelect(tbl, true)
 	emp.SetFilter("id", "=", "B2")
 	data := preparePqTest(t)
+	defer deleteAllPQData(t)
 	want := data[1]
 	checkListNextUsingArger(t, emp, want)
 	emp.Reset()
@@ -57,6 +59,7 @@ func TestListUsingReflect(t *testing.T) {
 	emp := NewPQSelect(tbl, true)
 	emp.SetFilter("id", "=", "B2")
 	data := preparePqTest(t)
+	defer deleteAllPQData(t)
 	want := data[1]
 	checkListNextUsingReflect(t, emp, want)
 }
@@ -98,6 +101,7 @@ func TestListUsingReflecPtr(t *testing.T) {
 	emp := NewPQSelect(tbl, true)
 	emp.SetFilter("id", "=", "B2")
 	data := preparePqTest(t)
+	defer deleteAllPQData(t)
 	want := data[1]
 	checkListNextUsingReflectPtr(t, emp, want)
 }
@@ -179,6 +183,8 @@ func BenchmarkScanUsingArger(b *testing.B) {
 	if !*pqtest {
 		b.Skip("to run a benchmark for pq database run the test with pqtest,dbuser and dbpasswd flag.")
 	}
+	preparePQBench(b)
+	b.ReportAllocs()
 	tbl, err := NewTable("emp", pqEmp{})
 	if err != nil {
 		b.Errorf("newTable err: %v", err)
@@ -213,6 +219,8 @@ func BenchmarkScanUsingReflect(b *testing.B) {
 	if !*pqtest {
 		b.Skip("to run a benchmark for pq database run the test with pqtest,dbuser and dbpasswd flag.")
 	}
+	preparePQBench(b)
+	b.ReportAllocs()
 	tbl, err := NewTable("emp", pqEmp{})
 	if err != nil {
 		b.Errorf("newTable err: %v", err)
@@ -245,4 +253,66 @@ func benchmarkPQScanUsingReflec(b *testing.B, empList *List) {
 	if err != nil {
 		b.Error(err)
 	}
+}
+
+func BenchmarkGetByPKDirectScan(b *testing.B) {
+	if !*pqtest {
+		b.Skip("to run a benchmark for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
+	preparePQBench(b)
+	b.ReportAllocs()
+	pqe := pqEmp{}
+	tbl, err := NewTable("emp", pqEmp{})
+	if err != nil {
+		b.Errorf("newTable err: %v", err)
+	}
+	emp := NewPQSelect(tbl, true)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		row := db.QueryRow(emp.SelectByPK(), "B2")
+		if err := row.Scan(&pqe.ID, &pqe.Name, &pqe.Child, &pqe.JoinDate); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkGetByPK(b *testing.B) {
+	if !*pqtest {
+		b.Skip("to run a benchmark for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
+	preparePQBench(b)
+	b.ReportAllocs()
+	pqe := pqEmp{}
+	tbl, err := NewTable("emp", pqEmp{})
+	if err != nil {
+		b.Errorf("newTable err: %v", err)
+	}
+	emp := NewPQSelect(tbl, true)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := emp.GetByPK(db, &pqe, "B2"); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+var onceB sync.Once
+
+func preparePQBench(b *testing.B) {
+	data := []pqEmp{
+		{"A1", "AN1", 0, newTime(2010, time.January, 1)},
+		{"B2", "BN2", 1, newTime(2010, time.February, 2)},
+		{"C3", "CN3", 2, newTime(2010, time.March, 3)},
+		{"C4", "DN4", 3, newTime(2010, time.April, 3)},
+		{"D5", "DN5", 0, newTime(2010, time.January, 1)},
+		{"E6", "EN6", 1, newTime(2010, time.February, 2)},
+		{"F7", "FN7", 2, newTime(2010, time.March, 3)},
+		{"G8", "GN8", 3, newTime(2010, time.April, 3)},
+		{"H9", "HN9", 3, newTime(2010, time.April, 3)},
+	}
+	onceB.Do(func() {
+		openPQDB()
+		createTable()
+		insertPQData(b, data)
+	})
 }

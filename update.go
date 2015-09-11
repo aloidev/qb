@@ -32,19 +32,6 @@ func NewPQUpdate(t Tabler) *Update {
 	return &Update{t: t, driver: "pq"}
 }
 
-func (u *Update) getArgs(src interface{}) []interface{} {
-	args := make([]interface{}, len(u.t.Fields()))
-	if tbl, ok := u.t.(Table); ok {
-		rt := reflect.ValueOf(src)
-		for i, idx := range tbl.fieldsIndex {
-			args[i] = rt.Field(idx).Interface()
-		}
-		return args
-	}
-	//TODO:use reflection
-	return args
-}
-
 //Set set the field to be updated, the field to be update can't be part of Primary keys.
 func (u *Update) Set(field string, value interface{}) error {
 	field = strings.ToLower(field)
@@ -141,6 +128,19 @@ func (u *Update) InsertQuery() string {
 		strings.Join(u.t.Fields(), ","),
 		u.makePlaceholder(n))
 	return query
+}
+
+func (u *Update) getArgs(src interface{}) []interface{} {
+	args := make([]interface{}, len(u.t.Fields()))
+	if tbl, ok := u.t.(Table); ok {
+		rt := reflect.ValueOf(src)
+		for i, idx := range tbl.fieldsIndex {
+			args[i] = rt.Field(idx).Interface()
+		}
+		return args
+	}
+	//TODO:use reflection
+	return args
 }
 
 //DeleteByPK delete the data from database that match with the arrgs.

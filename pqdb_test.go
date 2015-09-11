@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"log"
 	"reflect"
 	"sync"
 	"testing"
@@ -32,6 +33,7 @@ func TestSelectWithPQDatabase(t *testing.T) {
 		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
 	}
 	data := preparePqTest(t)
+	defer deleteAllPQData(t)
 	tbl, err := NewTable("emp", data[0])
 	if err != nil {
 		t.Errorf("create table err: %v", err)
@@ -78,44 +80,56 @@ func init() {
 	flag.Parse()
 }
 
-func openPQDB(t *testing.T) {
+func openPQDB() {
 	ds := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", *dbuser, *dbpasswd, *dbname)
 	var err error
 	db, err = sql.Open("postgres", ds)
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
 	err = db.Ping()
 	if err != nil {
-		t.Fatal(err)
+		log.Fatal(err)
 	}
 }
 
-func createTable(t *testing.T) {
+func createTable() {
 	d := "DROP TABLE IF EXISTS emp"
 	_, err := db.Exec(d)
 	if err != nil {
-		t.Errorf("drop table err: %v", err)
+		log.Fatalf("drop table err: %v", err)
 	}
 	q := "CREATE TABLE IF NOT EXISTS emp (ID varchar PRIMARY KEY,Name varchar,child numeric,joindate timestamp)"
 	_, err = db.Exec(q)
 	if err != nil {
-		t.Errorf("create table err: %v", err)
+		log.Fatalf("create table err: %v", err)
 	}
 }
 
-func populateData(t *testing.T, data []pqEmp) {
+func insertPQData(t testing.TB, data []pqEmp) {
+	name := "emp"
+	tbl, err := NewTable(name, data[0])
+	if err != nil {
+		t.Fatalf("insert NewTable %s err: %v", name, err)
+	}
+	u := NewPQUpdate(tbl)
+	for i, v := range data {
+		if err := u.Insert(db, v); err != nil {
+			t.Fatalf("insert data: %d err: %v", i, err)
+		}
+	}
+}
+
+func deleteAllPQData(t *testing.T) {
+	name := "emp"
 	tbl, err := NewTable("emp", pqEmp{})
 	if err != nil {
-		t.Fatal(err)
+		t.Errorf("Delete NewTable %s err: %v", name, err)
 	}
-	b := NewPQUpdate(tbl)
-	insertQ := b.InsertQuery()
-	for i, v := range data {
-		_, err := db.Exec(insertQ, v.ID, v.Name, v.Child, v.JoinDate)
-		if err != nil {
-			t.Errorf("insert data: %d failed err: %v", i, err)
-		}
+	u := NewPQUpdate(tbl)
+	err = u.Delete(db)
+	if err != nil {
+		t.Fatalf("delete data: %s err: %v", name, err)
 	}
 }
 
@@ -123,7 +137,7 @@ func newTime(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
-var once sync.Once
+var onceT sync.Once
 
 func preparePqTest(t *testing.T) []pqEmp {
 	data := []pqEmp{
@@ -137,10 +151,10 @@ func preparePqTest(t *testing.T) []pqEmp {
 		{"G8", "GN8", 3, newTime(2010, time.April, 3)},
 		{"H9", "HN9", 3, newTime(2010, time.April, 3)},
 	}
-	once.Do(func() {
-		openPQDB(t)
-		createTable(t)
-		populateData(t, data)
+	onceT.Do(func() {
+		openPQDB()
+		createTable()
 	})
+	insertPQData(t, data)
 	return data
 }

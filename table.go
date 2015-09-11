@@ -10,9 +10,11 @@ import (
 
 //Table implement Tabler interface to help using builder without implements the tabler interface.
 type Table struct {
-	name       string
-	fields     []string
-	primaryKey []string
+	name   string
+	fields []string
+	//fieldsIndex is an index of the field on the struct.
+	fieldsIndex []int
+	primaryKey  []string
 }
 
 //NewTaable create Tabler implementation using reflection.
@@ -43,6 +45,7 @@ func fromStruct(name string, s reflect.Type) (t Table, err error) {
 		field := s.Field(i)
 		if !field.Anonymous {
 			t.fields = append(t.fields, strings.ToLower(field.Name))
+			t.fieldsIndex = append(t.fieldsIndex, i)
 		}
 	}
 	t.primaryKey, err = primaryKeys(s)

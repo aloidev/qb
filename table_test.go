@@ -3,6 +3,7 @@ package qb
 import (
 	"reflect"
 	"testing"
+	"time"
 )
 
 type testCase struct {
@@ -16,6 +17,20 @@ func TestNewTableSimple(t *testing.T) {
 	type simple struct {
 		ID   string `pk:"1"`
 		Name string
+	}
+	tc := testCase{
+		in:         simple{},
+		tableName:  "simple",
+		wantFields: []string{"id", "name"},
+		wantPK:     []string{"id"},
+	}
+	testNewTable(t, tc)
+}
+
+func TestNewTableSimpleWithOtherTag(t *testing.T) {
+	type simple struct {
+		ID   string `pk:"1" json:"id"`
+		Name string `json:"name"`
 	}
 	tc := testCase{
 		in:         simple{},
@@ -128,4 +143,25 @@ func testNewTableShouldFail(t *testing.T, invalid interface{}) {
 	if _, err := NewTable("name", invalid); err == nil {
 		t.Errorf("expected error when create the table.")
 	}
+}
+
+func BenchmarkNewTableSmall(b *testing.B) {
+	type small struct {
+		ID       string    `pk:"1" json:"id"`
+		Name     string    `json:"name"`
+		Amount   float64   `json:"amount"`
+		JoinDate time.Time `json:"joinDate"`
+		Age      int       `json:"age"`
+		Group    string    `json:"group"`
+		Skill    string    `json:"skill"`
+	}
+	var result Tabler
+	for i := 0; i < b.N; i++ {
+		tbl, err := NewTable("", small{})
+		if err != nil {
+			b.Error(err)
+		}
+		result = tbl
+	}
+	_ = result
 }

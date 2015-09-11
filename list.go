@@ -177,24 +177,13 @@ func (sc fieldScanner) Scan(src interface{}) error {
 		sc.dv.SetFloat(f64)
 		return nil
 	case reflect.Struct:
-		if dtt, ok := sc.dv.Interface().(time.Time); ok {
+		if _, ok := sc.dv.Interface().(time.Time); ok {
 			s := asString(src)
-			var err error
-			dtt, err = time.Parse(pqTime, s)
-			fmt.Println("is time struct", dtt)
-			// sc.dv.Set(reflect.New(sc.dv.Type()))
+			dtt, err := time.Parse(pqTime, s)
 			sc.dv.Set(reflect.ValueOf(dtt))
-			// tt = st
 			return err
-			// s := asString(src)
-			// err := tt.UnmarshalText([]byte(s))
-			// return err
-		} else {
-			_ = dtt
 		}
-		// _ = tt
 	}
-
 	return fmt.Errorf("unsupported driver -> Scan pair: %T -> %T", src, sc.dv)
 }
 

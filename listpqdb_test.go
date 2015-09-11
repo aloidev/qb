@@ -46,7 +46,7 @@ func TestListNextUsingScanArger(t *testing.T) {
 	checkListNextUsingArger(t, emp, want)
 }
 
-func TestListUsingReflec(t *testing.T) {
+func TestListUsingReflect(t *testing.T) {
 	if !*pqtest {
 		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
 	}
@@ -56,10 +56,8 @@ func TestListUsingReflec(t *testing.T) {
 	}
 	emp := NewPQSelect(tbl, true)
 	emp.SetFilter("id", "=", "B2")
-	// emp.SetFields("id", "name", "child")
 	data := preparePqTest(t)
 	want := data[1]
-	// got := new(pqEmp)
 	checkListNextUsingReflect(t, emp, want)
 }
 
@@ -71,18 +69,13 @@ func checkListNextUsingReflect(t *testing.T, emp *Select, want pqEmp) {
 	got := new(pqEmp)
 	var err error
 	for {
-		err = empList.Next(got)
-		if err != nil {
-			if err == ErrDone {
-				err = nil
-			}
+		if err = empList.Next(got); err != nil {
 			break
 		}
 	}
-	if err != nil {
+	if err != nil && err != ErrDone {
 		t.Error(err)
 	}
-
 	got.JoinDate = got.JoinDate.UTC()
 	checkResult(t, emp, *got, want)
 }
@@ -104,7 +97,6 @@ func TestListUsingReflecPtr(t *testing.T) {
 	}
 	emp := NewPQSelect(tbl, true)
 	emp.SetFilter("id", "=", "B2")
-	// emp.SetFields("id", "name", "child")
 	data := preparePqTest(t)
 	want := data[1]
 	checkListNextUsingReflectPtr(t, emp, want)
@@ -121,15 +113,11 @@ func checkListNextUsingReflectPtr(t *testing.T, emp *Select, want pqEmp) {
 	got.JoinDate = new(time.Time)
 	var err error
 	for {
-		err = empList.Next(got)
-		if err != nil {
-			if err == ErrDone {
-				err = nil
-			}
+		if err = empList.Next(got); err != nil {
 			break
 		}
 	}
-	if err != nil {
+	if err != nil && err != ErrDone {
 		t.Error(err)
 	}
 
@@ -153,19 +141,15 @@ func checkListNextUsingArger(t *testing.T, emp *Select, want pqEmp) {
 	for {
 		err = empList.Next(sa)
 		if err != nil {
-			if err == ErrDone {
-				err = nil
-			}
 			break
 		}
 	}
-	if err != nil {
+	if err != nil && err != ErrDone {
 		t.Error(err)
 	}
 	sa.emp.JoinDate = sa.emp.JoinDate.UTC()
 	got := sa.emp
 	checkResult(t, emp, got, want)
-
 }
 
 func checkResult(t *testing.T, emp *Select, got, want pqEmp) {
@@ -216,15 +200,11 @@ func benchmarkPQScanUsingArger(b *testing.B, empList *List) {
 	sa := new(pqEmpArger)
 	var err error
 	for {
-		err = empList.Next(sa)
-		if err != nil {
-			if err == ErrDone {
-				err = nil
-			}
+		if err = empList.Next(sa); err != nil {
 			break
 		}
 	}
-	if err != nil {
+	if err != nil && err != ErrDone {
 		b.Error(err)
 	}
 }

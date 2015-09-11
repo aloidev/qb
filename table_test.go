@@ -40,6 +40,35 @@ func TestNewTableMultiplePK(t *testing.T) {
 	testNewTable(t, tc)
 }
 
+func TestNewTableFieldPtr(t *testing.T) {
+	type simple struct {
+		ID   *string `pk:"1"`
+		Name string
+	}
+	tc := testCase{
+		in:         simple{},
+		tableName:  "simple",
+		wantFields: []string{"id", "name"},
+		wantPK:     []string{"id"},
+	}
+	testNewTable(t, tc)
+}
+
+func TestNewTableFieldPtrMoreThanOne(t *testing.T) {
+	type simple struct {
+		ID     *string `pk:"1"`
+		Name   string
+		Amount *float64
+	}
+	tc := testCase{
+		in:         simple{},
+		tableName:  "simple",
+		wantFields: []string{"id", "name", "amount"},
+		wantPK:     []string{"id"},
+	}
+	testNewTable(t, tc)
+}
+
 func testNewTable(t *testing.T, tc testCase) {
 	st, err := NewTable(tc.tableName, tc.in)
 	if err != nil {

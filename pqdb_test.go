@@ -89,7 +89,7 @@ func TestSelectGetByPK(t *testing.T) {
 	checkResult(t, emp, got, want)
 }
 
-func TestUpdateDeleteByPK(t *testing.T) {
+func TestDeleteByPK(t *testing.T) {
 	preparePqTest(t)
 	defer deleteAllPQData(t)
 	empUpdate := newPqUpdateTest(t)
@@ -107,7 +107,7 @@ func TestUpdateDeleteByPK(t *testing.T) {
 	checkResult(t, empSelect, got, want)
 }
 
-func TestUpdateDelete(t *testing.T) {
+func TestDelete(t *testing.T) {
 	data := preparePqTest(t)
 	defer deleteAllPQData(t)
 	empUpdate := newPqUpdateTest(t)
@@ -123,6 +123,58 @@ func TestUpdateDelete(t *testing.T) {
 			t.Error(err)
 		}
 		want := pqEmp{}
+		checkResult(t, empSelect, got, want)
+	}
+}
+
+func TestUpdateByPK(t *testing.T) {
+	preparePqTest(t)
+	defer deleteAllPQData(t)
+	empUpdate := newPqUpdateTest(t)
+	empUpdate.Set("Name", "UCN4")
+	err := empUpdate.UpdateByPK(db, "C3")
+	if err != nil {
+		t.Error(err)
+	}
+	want := pqEmp{ID: "C3", Name: "UCN4", Child: 2, JoinDate: newTime(2010, time.March, 3)}
+	empSelect := newPQSelectTest(t)
+	got := pqEmp{}
+	empSelect.GetByPK(db, &got, "C3")
+	checkResult(t, empSelect, got, want)
+}
+
+func TestUpdate(t *testing.T) {
+	data := preparePqTest(t)
+	defer deleteAllPQData(t)
+	empUpdate := newPqUpdateTest(t)
+	empUpdate.Set("Name", "ALLSame")
+	err := empUpdate.Update(db)
+	if err != nil {
+		t.Error(err)
+	}
+	empSelect := newPQSelectTest(t)
+	got := pqEmp{}
+	for _, v := range data {
+		err = empSelect.GetByPK(db, &got, v.ID)
+		if err != nil && err != sql.ErrNoRows {
+			t.Error(err)
+		}
+		want := v
+		want.Name = "ALLSame"
+		checkResult(t, empSelect, got, want)
+	}
+	empUpdate.Set("Name", "xxxSame")
+	empUpdate.Set("NaMe", "NotXXXSame")
+	if err := empUpdate.Update(db); err != nil {
+		t.Errorf("update twice err: %v", err)
+	}
+	for _, v := range data {
+		err = empSelect.GetByPK(db, &got, v.ID)
+		if err != nil && err != sql.ErrNoRows {
+			t.Error(err)
+		}
+		want := v
+		want.Name = "NotXXXSame"
 		checkResult(t, empSelect, got, want)
 	}
 }

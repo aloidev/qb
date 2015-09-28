@@ -43,15 +43,19 @@ func fromStruct(name string, s reflect.Type) (t Table, err error) {
 
 	for i := 0; i < n; i++ {
 		field := s.Field(i)
-		if !field.Anonymous {
-			t.fields = append(t.fields, strings.ToLower(field.Name))
-			t.fieldsIndex = append(t.fieldsIndex, i)
+		if field.Anonymous || !isExported(field) {
+			continue
 		}
+		t.fields = append(t.fields, strings.ToLower(field.Name))
+		t.fieldsIndex = append(t.fieldsIndex, i)
 	}
 	t.primaryKey, err = primaryKeys(s)
 	return t, err
 }
 
+func isExported(field reflect.StructField) bool {
+	return field.PkgPath == ""
+}
 func primaryKeys(s reflect.Type) ([]string, error) {
 	pk := make(map[int]string, 0)
 	var pkNum sort.IntSlice

@@ -56,6 +56,74 @@ func (l *List) Get(qe QueryExecer) error {
 	return nil
 }
 
+//GetAll execute the query and store the result to the dst.
+//Dst should be pointer to slice.
+func (l *List) GetAll(qe QueryExecer, dstx interface{}) error {
+	if err := l.Get(qe); err != nil {
+		return err
+	}
+	vo := reflect.ValueOf(dstx)
+	if vo.Kind() != reflect.Ptr || vo.Elem().Kind() != reflect.Slice {
+		return errors.New("dst must be pointer to slice")
+	}
+	dst := reflect.Indirect(vo)
+	n := dst.Len()
+	kind := dst.Type().Elem().Kind()
+	var v reflect.Value
+	if kind == reflect.Struct {
+		v = reflect.New(dst.Type().Elem())
+	}
+	i := 0
+	var err error
+	for l.rows.Next() {
+		if err = scanReflectValue(l.s.fields, l.rows, v); err != nil {
+			return err
+		}
+		if i < n {
+			dst.Index(i).Set(v.Elem())
+		} else {
+			dst = reflect.Append(dst, v.Elem())
+		}
+		i++
+	}
+
+	err = l.rows.Err()
+	if err != nil {
+		return err
+	}
+	dst.SetLen(i)
+	vo.Elem().Set(dst)
+	return nil
+}
+
+func (l *List) GetNext(qe QueryExecer, cursor string) error {
+	err := l.s.setCursor(cursor)
+	if err != nil {
+		return err
+	}
+	l.s.offset += l.s.limit
+	query, args := l.s.Query()
+	rows, err := qe.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	l.rows = rows
+	return nil
+}
+
+func (l *List) GetLast(qe QueryExecer, cursor string) error {
+	if err := l.s.getLast(qe, cursor); err != nil {
+		return err
+	}
+	query, args := l.s.Query()
+	rows, err := qe.Query(query, args...)
+	if err != nil {
+		return err
+	}
+	l.rows = rows
+	return nil
+}
+
 //Next scan the rows and save the result to the dst.
 //dst must be pointer to struct or implement ScanArger.
 func (l *List) Next(dst interface{}) error {
@@ -66,10 +134,13 @@ func (l *List) Next(dst interface{}) error {
 			return l.scanWithArger(sa)
 		}
 		// return l.scanWithReflect(dst)
-		if err := scanWithReflection(l.s.fields, l.rows, dst); err != nil {
+		v := reflect.ValueOf(dst)
+		if err := scanReflectValue(l.s.fields, l.rows, v); err != nil {
+			// if err := scanWithReflection(l.s.fields, l.rows, dst); err != nil {
 			l.rows.Close()
 			return err
 		}
+		return nil
 	}
 	if err := l.rows.Err(); err != nil {
 		return err
@@ -97,6 +168,46 @@ type rowScanner interface {
 
 func scanWithReflection(fields []string, r rowScanner, dst interface{}) error {
 	v := reflect.ValueOf(dst)
+	return scanReflectValue(fields, r, v)
+	// if v.Kind() != reflect.Ptr || v.IsNil() {
+	// 	return errors.New("dst must be pointer to struct")
+	// }
+	// ve := v.Elem()
+	// n := ve.NumField()
+	// if n <= 0 || n < len(fields) {
+	// 	return errors.New("destination field not enough")
+	// }
+	//
+	// var args []interface{}
+	// for _, field := range fields {
+	// 	dstF := ve.FieldByNameFunc(func(dstName string) bool {
+	// 		if strings.ToLower(dstName) == field {
+	// 			return true
+	// 		}
+	// 		return false
+	// 	})
+	// 	if dstS, ok := dstF.Interface().(sql.Scanner); ok {
+	// 		args = append(args, dstS)
+	// 		continue
+	// 	}
+	// 	if dstF.Kind() == reflect.Ptr {
+	// 		args = append(args, dstF.Interface())
+	// 		continue
+	// 	}
+	// 	if dstF.IsValid() {
+	// 		args = append(args, fieldScanner{dv: dstF})
+	// 	}
+	// }
+	// if len(args) != len(fields) {
+	// 	return errors.New("destination field not enough")
+	// }
+	// if err := r.Scan(args...); err != nil {
+	// 	return err
+	// }
+	// return nil
+}
+
+func scanReflectValue(fields []string, r rowScanner, v reflect.Value) error {
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return errors.New("dst must be pointer to struct")
 	}

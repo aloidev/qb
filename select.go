@@ -8,6 +8,7 @@
 package qb
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -49,9 +50,40 @@ func NewPQSelect(t Tabler, explicit bool) *Select {
 //GetByPK execute the query using qe with aargs and save the result to dst.
 //dst must be pointer to struct.
 func (s *Select) GetByPK(qe QueryExecer, dst interface{}, args ...interface{}) error {
+	if len(args) == 0 {
+		return errors.New("args is invalid")
+	}
 	row := qe.QueryRow(s.SelectByPK(), args...)
 	err := scanWithReflection(s.t.Fields(), row, dst)
 	return err
+}
+
+//GetByPKWithCursor execute the query using qe with aargs and save the result to dst.
+//dst must be pointer to struct.
+func (s *Select) GetByPKWithCursor(qe QueryExecer, dst interface{}, args ...interface{}) (cursor string, err error) {
+	err = s.GetByPK(qe, dst, args...)
+	if err != nil {
+		return cursor, err
+	}
+	cursor, err = s.byPKCursor(qe, args...)
+	return cursor, err
+}
+
+func (s *Select) byPKCursor(qe QueryExecer, args ...interface{}) (cursor string, err error) {
+	c := Cursor{limit: 1, fields: s.fields, orderBy: s.orderBy}
+	orderBy := s.orderByQuery()
+	where, _ := s.pkWhereQuery(1)
+
+	q := "SELECT row_number FROM (SELECT " + strings.Join(s.t.PrimaryKeys(), ",") +
+		",row_number() OVER (" + orderBy + " ) FROM " + s.t.TableName() + ") as xxrn" + where
+	// fmt.Println("query:", q)
+	err = qe.QueryRow(q, args...).Scan(&c.offset)
+	if err != nil {
+		return cursor, err
+	}
+	c.offset--
+	cursor = c.String()
+	return cursor, err
 }
 
 func (s *Select) Get(qe QueryExecer) (*List, error) {
@@ -66,6 +98,98 @@ func (s *Select) Get(qe QueryExecer) (*List, error) {
 	}
 	l := &List{s: s, rows: rows}
 	return l, nil
+}
+
+//GetNext get the next row based on the cursor save it to dst.
+func (s *Select) GetNext(qe QueryExecer, dst interface{}, cursor string) error {
+	if err := s.setCursor(cursor); err != nil {
+		return err
+	}
+	s.offset += s.limit
+	query, args := s.Query()
+	row := qe.QueryRow(query, args...)
+	err := scanWithReflection(s.t.Fields(), row, dst)
+	return err
+}
+
+//GetNext get the next row based on the cursor save it to dst.
+func (s *Select) GetPrevious(qe QueryExecer, dst interface{}, cursor string) error {
+	if err := s.setCursor(cursor); err != nil {
+		return err
+	}
+	s.offset -= s.limit
+	query, args := s.Query()
+	row := qe.QueryRow(query, args...)
+	err := scanWithReflection(s.t.Fields(), row, dst)
+	return err
+}
+
+func (s *Select) GetLast(qe QueryExecer, dst interface{}, cursor string) error {
+	if err := s.getLast(qe, cursor); err != nil {
+		return err
+	}
+	query, args := s.Query()
+	row := qe.QueryRow(query, args...)
+	err := scanWithReflection(s.t.Fields(), row, dst)
+	return err
+}
+
+func (s *Select) getLast(qe QueryExecer, cursor string) error {
+	if err := s.setCursor(cursor); err != nil {
+		return err
+	}
+	count, err := s.getCount(qe)
+	if err != nil {
+		return err
+	}
+	if count-s.limit <= s.offset {
+		return ErrDone
+	}
+	s.offset = count - s.limit
+	return nil
+}
+
+func (s *Select) getCount(qe QueryExecer) (int, error) {
+	where, args, _ := s.filterQuery(1)
+	query := "SELECT count(*) FROM " + s.t.TableName() + where
+	var count int
+	err := qe.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
+func (s *Select) setCursor(cursor string) error {
+	c := Cursor{}
+	c, err := c.Decode(cursor)
+	if err != nil {
+		return err
+	}
+	if len(c.fields) != 0 {
+		s.fields = c.fields
+	}
+	if len(c.filters) != 0 {
+		s.filters = c.filters
+	}
+	if len(c.orderBy) != 0 {
+		s.orderBy = c.orderBy
+	}
+	s.limit = c.limit
+	s.offset = c.offset
+	return nil
+}
+
+func (s *Select) Cursor() string {
+	if len(s.fields) == 0 && len(s.filters) == 0 && len(s.orderBy) == 0 &&
+		s.limit <= 0 && s.offset == 0 {
+		return ""
+	}
+	c := Cursor{
+		fields:  s.fields,
+		filters: s.filters,
+		orderBy: s.orderBy,
+		limit:   s.limit,
+		offset:  s.offset,
+	}
+	return c.String()
 }
 
 //SetFields set the fields to retrieve from table.

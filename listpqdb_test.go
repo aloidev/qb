@@ -90,6 +90,28 @@ type pqEmpPtr struct {
 	JoinDate *time.Time
 }
 
+func TestListGetAll(t *testing.T) {
+	if !*pqtest {
+		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
+	tbl, err := NewTable("emp", pqEmpPtr{})
+	if err != nil {
+		t.Errorf("newTable err: %v", err)
+	}
+	emp := NewPQSelect(tbl, true)
+	want := preparePqTest(t)
+	defer deleteAllPQData(t)
+	list := NewList(emp)
+	dst := make([]pqEmp, 30)
+	err = list.GetAll(db, &dst)
+	if err != nil {
+		t.Error(err)
+	}
+	for i, got := range dst {
+		checkResult(t, emp, got, want[i])
+	}
+}
+
 func TestListUsingReflecPtr(t *testing.T) {
 	if !*pqtest {
 		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
@@ -231,11 +253,11 @@ func BenchmarkScanUsingReflect(b *testing.B) {
 	empList := NewList(emp)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		benchmarkPQScanUsingArger(b, empList)
+		benchmarkPQScanUsingReflection(b, empList)
 	}
 }
 
-func benchmarkPQScanUsingReflec(b *testing.B, empList *List) {
+func benchmarkPQScanUsingReflection(b *testing.B, empList *List) {
 	if err := empList.Get(db); err != nil {
 		b.Errorf("list get err: %v", err)
 	}

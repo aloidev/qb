@@ -77,6 +77,9 @@ func queryRowPQ(t *testing.T, query string, args ...interface{}) pqEmp {
 }
 
 func TestSelectGetByPK(t *testing.T) {
+	if !*pqtest {
+		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
 	data := preparePqTest(t)
 	defer deleteAllPQData(t)
 	emp := newPQSelectTest(t)
@@ -87,6 +90,161 @@ func TestSelectGetByPK(t *testing.T) {
 		t.Error(err)
 	}
 	checkResult(t, emp, got, want)
+}
+
+func TestSelectGetByPKWithCursor(t *testing.T) {
+	if !*pqtest {
+		t.Skip("to run a test for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
+	data := preparePqTest(t)
+	defer deleteAllPQData(t)
+	emp := newPQSelectTest(t)
+	start := 2
+	want := data[start]
+	got := pqEmp{}
+	cursor, err := emp.GetByPKWithCursor(db, &got, "C3")
+	if err != nil {
+		t.Error(err)
+	}
+	checkResult(t, emp, got, want)
+	// fmt.Printf("cursor: %s", cursor)
+	err = emp.GetNext(db, &got, cursor)
+	if err != nil {
+		t.Fatalf("getNext err : %v", err)
+	}
+	next := start + 1
+	want = data[next]
+	checkResult(t, emp, got, want)
+	cursor = emp.Cursor()
+	err = emp.GetPrevious(db, &got, cursor)
+	if err != nil {
+		t.Fatalf("getPrevious err : %v", err)
+	}
+	want = data[start]
+	checkResult(t, emp, got, want)
+	cursor = emp.Cursor()
+	err = emp.GetLast(db, &got, cursor)
+	if err != nil {
+		t.Fatalf("getLast err : %v", err)
+	}
+	want = data[len(data)-1]
+	checkResult(t, emp, got, want)
+}
+
+//TODO:refactor this
+func TestGetNext(t *testing.T) {
+	data := preparePqTest(t)
+	defer deleteAllPQData(t)
+	emp := newPQSelectTest(t)
+	// list, err := emp.SetLimit(2).Get(db)
+	emp.SetLimit(2)
+	list := NewList(emp)
+	err := list.Get(db)
+	if err != nil {
+		t.Fatalf("get list err: %v", err)
+	}
+	// q, args := emp.Query()
+	// fmt.Printf("list q : %s and args: %v", q, args)
+	wants := data[:2]
+	var gots []pqEmp
+	got := new(pqEmp)
+	for {
+		if err = list.Next(got); err != nil {
+			break
+		}
+		gots = append(gots, *got)
+	}
+	if err != ErrDone {
+		t.Fatalf("got err: %v want ErrDone", err)
+	}
+	if len(gots) != len(wants) {
+		t.Fatalf("gots len: %d want len %d", len(gots), len(wants))
+	}
+	for i, want := range wants {
+		got := gots[i]
+		checkResult(t, emp, got, want)
+	}
+	cursor := emp.Cursor()
+	err = list.GetNext(db, cursor)
+	if err != nil {
+		t.Fatalf("list GetNext err: %v", err)
+	}
+	wants = data[2:4]
+	gots = gots[:0]
+	for {
+		if err = list.Next(got); err != nil {
+			break
+		}
+		gots = append(gots, *got)
+	}
+	if err != ErrDone {
+		t.Fatalf("got err: %v want ErrDone", err)
+	}
+	if len(gots) != len(wants) {
+		t.Fatalf("gots len: %d want len %d", len(gots), len(wants))
+	}
+	for i, want := range wants {
+		got := gots[i]
+		checkResult(t, emp, got, want)
+	}
+}
+
+//TODO:refactor this
+func TestGetLast(t *testing.T) {
+	data := preparePqTest(t)
+	defer deleteAllPQData(t)
+	emp := newPQSelectTest(t)
+	// list, err := emp.SetLimit(2).Get(db)
+	emp.SetLimit(2)
+	list := NewList(emp)
+	err := list.Get(db)
+	if err != nil {
+		t.Fatalf("get list err: %v", err)
+	}
+	// q, args := emp.Query()
+	// fmt.Printf("list q : %s and args: %v", q, args)
+	wants := data[:2]
+	var gots []pqEmp
+	got := new(pqEmp)
+	for {
+		if err = list.Next(got); err != nil {
+			break
+		}
+		gots = append(gots, *got)
+	}
+	if err != ErrDone {
+		t.Fatalf("got err: %v want ErrDone", err)
+	}
+	if len(gots) != len(wants) {
+		t.Fatalf("gots len: %d want len %d", len(gots), len(wants))
+	}
+	for i, want := range wants {
+		got := gots[i]
+		checkResult(t, emp, got, want)
+	}
+	cursor := emp.Cursor()
+	err = list.GetLast(db, cursor)
+	if err != nil {
+		t.Fatalf("list GetNext err: %v", err)
+	}
+	wants = data[len(data)-2:]
+	gots = gots[:0]
+	for {
+		if err = list.Next(got); err != nil {
+			break
+		}
+		gots = append(gots, *got)
+	}
+	if err != ErrDone {
+		t.Fatalf("got err: %v want ErrDone", err)
+	}
+	if len(gots) != len(wants) {
+		t.Fatalf("gots len: %d want len %d", len(gots), len(wants))
+	}
+	for i, want := range wants {
+		got := gots[i]
+		checkResult(t, emp, got, want)
+	}
 }
 
 func TestDeleteByPK(t *testing.T) {
@@ -194,6 +352,27 @@ func newPqUpdateTest(t testing.TB) *Update {
 	}
 	emp := NewPQUpdate(tbl)
 	return emp
+}
+
+func BenchmarkGetLast(b *testing.B) {
+	if !*pqtest {
+		b.Skip("to run a benchmark for pq database run the test with pqtest,dbuser and dbpasswd flag.")
+	}
+	preparePQBench(b)
+	b.ReportAllocs()
+	emp := newPQSelectTest(b)
+	got := &pqEmp{}
+	cursor, err := emp.GetByPKWithCursor(db, got, "B2")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err = emp.GetLast(db, got, cursor)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 func init() {
